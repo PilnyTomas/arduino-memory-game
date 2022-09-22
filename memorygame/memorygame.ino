@@ -1,5 +1,5 @@
 #include <Bounce2.h>
-#include <Tone.h>
+#include "notes.h"
 
 #define RED_LED 0
 #define GREEN_LED 1
@@ -17,7 +17,6 @@ Bounce debouncerGreen = Bounce();
 Bounce debouncerBlue = Bounce();
 Bounce debouncerYellow = Bounce();
 
-Tone buzzer;
 
 unsigned short gameSequence[MAX_GAME_SEQUENCE];
 
@@ -45,7 +44,7 @@ void setup() {
   debouncerYellow.attach(YELLOW_BUTTON, INPUT_PULLUP);
   debouncerYellow.interval(30);
 
-  buzzer.begin(BUZZER_PIN);
+  pinMode(BUZZER_PIN, OUTPUT);
 }
 
 void loop() {  
@@ -130,9 +129,10 @@ void loop() {
         // A button was pressed, check it against current sequence...
         if (userPressed != gameSequence[userPositionInSequence]) {
           // Failed...
-          buzzer.play(NOTE_F3, 300);
+          tone(BUZZER_PIN, NOTE_F3, 300);
+          //
           delay(300);
-          buzzer.play(NOTE_G3, 500);
+          tone(BUZZER_PIN, NOTE_G3, 500);
           delay(2500);
           gameInProgress = false;
         } else {
@@ -147,7 +147,7 @@ void loop() {
             }
 
             // Play a tone...
-            buzzer.play(NOTE_A3, 300);
+            tone(BUZZER_PIN, NOTE_A3, 300);
             delay(2000);
 
             showingSequenceToUser = true;
