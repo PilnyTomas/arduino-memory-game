@@ -1,15 +1,19 @@
 #include <Bounce2.h>
 #include "notes.h"
+#include "tft.h"
 
 #define RED_LED 0
 #define GREEN_LED 1
 #define BLUE_LED 2
 #define YELLOW_LED 3
+
 #define RED_BUTTON 4
 #define GREEN_BUTTON 5
 #define BLUE_BUTTON 6
 #define YELLOW_BUTTON 7
+
 #define BUZZER_PIN 8
+
 #define MAX_GAME_SEQUENCE 800
 
 Bounce debouncerRed = Bounce();
@@ -28,6 +32,7 @@ unsigned short currentSequenceLength;
 unsigned short userPositionInSequence;
 unsigned short n;
 unsigned long count = 0;
+uint8_t level = 0; // game level to be tracked on TFT display
 
 void setup() {
   pinMode(RED_LED, OUTPUT);
@@ -45,9 +50,11 @@ void setup() {
   debouncerYellow.interval(30);
 
   pinMode(BUZZER_PIN, OUTPUT);
+
+  tft_setup();
 }
 
-void loop() {  
+void loop() {
   if (! gameInProgress) {
     // Waiting for someone to press the green button...
     debouncerGreen.update();
@@ -75,7 +82,7 @@ void loop() {
       // Attract mode - flash the green LED.
       if (count == 50000) {
         attractLEDOn = ! attractLEDOn;
-        digitalWrite(GREEN_LED, attractLEDOn ? HIGH : LOW);    
+        digitalWrite(GREEN_LED, attractLEDOn ? HIGH : LOW);
         count = 0;    
       } 
       
