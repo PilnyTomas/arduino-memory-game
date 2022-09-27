@@ -1,18 +1,25 @@
 #include <Bounce2.h>
 #include "notes.h"
-#include "tft.h"
 
-#define RED_LED 0
-#define GREEN_LED 1
-#define BLUE_LED 2
-#define YELLOW_LED 3
+// Pinout set for ESP32-C3 DevkitC
+// Connect with S2 Kaluga via UART:
+//   C3   | Kaluga
+// RX1 18 | 19 TX
+// TX1 19 | 20 RX
 
-#define RED_BUTTON 4
-#define GREEN_BUTTON 5
-#define BLUE_BUTTON 6
-#define YELLOW_BUTTON 7
+#define YELLOW_LED 0
+#define BLUE_LED 1
+#define RED_LED 2
+#define GREEN_LED 3
 
-#define BUZZER_PIN 8
+#define YELLOW_BUTTON 4
+#define BLUE_BUTTON 5
+#define RED_BUTTON 6
+#define GREEN_BUTTON 7
+
+// GPIO 8 is for RGD LED on board
+
+#define BUZZER_PIN 9
 
 #define MAX_GAME_SEQUENCE 800
 
@@ -51,7 +58,18 @@ void setup() {
 
   pinMode(BUZZER_PIN, OUTPUT);
 
-  tft_setup();
+  Serial1.begin(115200);
+  while(!Serial1){delay(100);}
+
+/*
+  //demonstration
+  uint8_t level = 0;
+  do{
+    Serial1.write(level++);
+    delay(100);
+  }while(level <= 25);
+  Serial1.write(0);
+  */
 }
 
 void loop() {
@@ -60,7 +78,7 @@ void loop() {
     debouncerGreen.update();
 
     if (debouncerGreen.fell()) {
-      digitalWrite(GREEN_LED, LOW);
+      digitalWrite(GREEN_LED, HIGH);
       
       // Create a new game sequence.
       randomSeed(analogRead(0));
@@ -82,7 +100,7 @@ void loop() {
       // Attract mode - flash the green LED.
       if (count == 50000) {
         attractLEDOn = ! attractLEDOn;
-        digitalWrite(GREEN_LED, attractLEDOn ? HIGH : LOW);
+        digitalWrite(GREEN_LED, attractLEDOn ? LOW : HIGH);
         count = 0;    
       } 
       
@@ -93,9 +111,9 @@ void loop() {
     if (showingSequenceToUser) {
       // Play the pattern out to the user
       for (n = 0; n < currentSequenceLength; n++) {
-        digitalWrite(gameSequence[n] - 4, HIGH);
-        delay(currentDelay);
         digitalWrite(gameSequence[n] - 4, LOW);
+        delay(currentDelay);
+        digitalWrite(gameSequence[n] - 4, HIGH);
         delay(currentDelay);
       }
 
@@ -111,24 +129,24 @@ void loop() {
       unsigned short userPressed = 0;
 
       if (debouncerGreen.fell()) {
-        digitalWrite(GREEN_LED, HIGH);
-        delay(currentDelay);
         digitalWrite(GREEN_LED, LOW);
+        delay(currentDelay);
+        digitalWrite(GREEN_LED, HIGH);
         userPressed = GREEN_BUTTON;
       } else if (debouncerRed.fell()) {
-        digitalWrite(RED_LED, HIGH);
-        delay(currentDelay);
         digitalWrite(RED_LED, LOW);
+        delay(currentDelay);
+        digitalWrite(RED_LED, HIGH);
         userPressed = RED_BUTTON;
       } else if (debouncerBlue.fell()) {
-        digitalWrite(BLUE_LED, HIGH);
-        delay(currentDelay);
         digitalWrite(BLUE_LED, LOW);
+        delay(currentDelay);
+        digitalWrite(BLUE_LED, HIGH);
         userPressed = BLUE_BUTTON;
       } else if (debouncerYellow.fell()) {
-        digitalWrite(YELLOW_LED, HIGH);
-        delay(currentDelay);
         digitalWrite(YELLOW_LED, LOW);
+        delay(currentDelay);
+        digitalWrite(YELLOW_LED, HIGH);
         userPressed = YELLOW_BUTTON;
       }
 
