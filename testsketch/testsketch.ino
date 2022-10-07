@@ -18,8 +18,6 @@ Bounce debouncerGreen = Bounce();
 Bounce debouncerBlue = Bounce();
 Bounce debouncerYellow = Bounce();
 
-Tone buzzer;
-
 unsigned short currentDelay;
 
 void led_on(uint8_t pin){
@@ -30,24 +28,6 @@ void led_on(uint8_t pin){
 void led_off(uint8_t pin){
   pinMode(pin, INPUT);
 }
-
-bool create_yellow_task(){
-  TaskHandle_t yellow_task_handle = NULL;
-  xTaskCreate(
-    yellow_task,   // Function to implement the task
-    "yellow_task", // Name of the task
-    1000,              // Stack size in words
-    (void *) NULL,    // Task input parameter
-    1,                       // Priority of the task
-    &yellow_task_handle     // Task handle.
-    );
-  if(yellow_task_handle == NULL){
-    log_e("Could not create yellow task");
-    return false;
-  }
-  return true;
-}
-
 
 void setup() {
   Serial.begin(115200);
@@ -72,9 +52,6 @@ void setup() {
   debouncerBlue.interval(30);
   debouncerYellow.attach(YELLOW_BUTTON, INPUT_PULLUP);
   debouncerYellow.interval(30);
-
-  buzzer.begin(BUZZER_PIN);
-
 }
 
 bool red_led_state = false;
