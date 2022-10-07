@@ -7,16 +7,18 @@
 // RX1 18 | 19 TX
 // TX1 19 | 20 RX
 
-#define YELLOW_LED 0
-#define BLUE_LED 1
-#define RED_LED 2
-#define GREEN_LED 3
+#define RED_LED 4
+#define GREEN_LED 5
+#define BLUE_LED 6
+#define YELLOW_LED 7
 
-#define YELLOW_BUTTON 4
-#define BLUE_BUTTON 5
-#define RED_BUTTON 6
-#define GREEN_BUTTON 7
+#define RED_BUTTON 0
+#define GREEN_BUTTON 1
+#define BLUE_BUTTON 2
+#define YELLOW_BUTTON 3
 
+//for use with gameSequence[n]
+uint8_t button_pin_map[4] = {RED_LED, GREEN_LED, BLUE_LED, YELLOW_LED};
 // GPIO 8 is for RGD LED on board
 
 #define BUZZER_PIN 9
@@ -27,7 +29,6 @@ Bounce debouncerRed = Bounce();
 Bounce debouncerGreen = Bounce();
 Bounce debouncerBlue = Bounce();
 Bounce debouncerYellow = Bounce();
-
 
 unsigned short gameSequence[MAX_GAME_SEQUENCE];
 
@@ -41,12 +42,16 @@ unsigned short n;
 unsigned long count = 0;
 uint8_t level = 0; // game level to be tracked on TFT display
 
-void setup() {
-  pinMode(RED_LED, OUTPUT);
-  pinMode(GREEN_LED, OUTPUT);
-  pinMode(BLUE_LED, OUTPUT);
-  pinMode(YELLOW_LED, OUTPUT);
+void led_on(uint8_t pin){
+  pinMode(pin, OUTPUT);
+  digitalWrite(RED_LED, LOW);
+}
 
+void led_off(uint8_t pin){
+  pinMode(pin, INPUT);
+}
+
+void setup() {
   debouncerRed.attach(RED_BUTTON, INPUT_PULLUP);
   debouncerRed.interval(30);
   debouncerGreen.attach(GREEN_BUTTON, INPUT_PULLUP);
@@ -58,11 +63,10 @@ void setup() {
 
   pinMode(BUZZER_PIN, OUTPUT);
 
+/*
   Serial1.begin(115200);
   while(!Serial1){delay(100);}
 
-/*
-  //demonstration
   uint8_t level = 0;
   do{
     Serial1.write(level++);
@@ -84,7 +88,7 @@ void loop() {
       randomSeed(analogRead(0));
 
       for (n = 0; n < MAX_GAME_SEQUENCE; n++) {
-        gameSequence[n] = random(RED_BUTTON, YELLOW_BUTTON + 1);
+        gameSequence[n] = random(0, 3);
       }
 
       currentSequenceLength = 1;
@@ -100,7 +104,11 @@ void loop() {
       // Attract mode - flash the green LED.
       if (count == 50000) {
         attractLEDOn = ! attractLEDOn;
-        digitalWrite(GREEN_LED, attractLEDOn ? LOW : HIGH);
+        if(attractLEDOn){
+          led_on(GREEN_LED);
+        }else{
+          led_off(GREEN_LED);
+        }
         count = 0;    
       } 
       
@@ -111,9 +119,9 @@ void loop() {
     if (showingSequenceToUser) {
       // Play the pattern out to the user
       for (n = 0; n < currentSequenceLength; n++) {
-        digitalWrite(gameSequence[n] - 4, LOW);
+        led_on(button_pin_map[gameSequence[n]]);
         delay(currentDelay);
-        digitalWrite(gameSequence[n] - 4, HIGH);
+        led_off(button_pin_map[gameSequence[n]]);
         delay(currentDelay);
       }
 
@@ -128,25 +136,25 @@ void loop() {
 
       unsigned short userPressed = 0;
 
-      if (debouncerGreen.fell()) {
-        digitalWrite(GREEN_LED, LOW);
+      if (debouncerRed.fell()) {
+        led_on(RED_LED);
         delay(currentDelay);
-        digitalWrite(GREEN_LED, HIGH);
-        userPressed = GREEN_BUTTON;
-      } else if (debouncerRed.fell()) {
-        digitalWrite(RED_LED, LOW);
-        delay(currentDelay);
-        digitalWrite(RED_LED, HIGH);
+        led_off(RED_LED);
         userPressed = RED_BUTTON;
-      } else if (debouncerBlue.fell()) {
-        digitalWrite(BLUE_LED, LOW);
+      } else  if (debouncerGreen.fell()) {
+        led_on(GREEN_LED);
         delay(currentDelay);
-        digitalWrite(BLUE_LED, HIGH);
+        led_off(GREEN_LED);
+        userPressed = GREEN_BUTTON;
+      } else  if (debouncerBlue.fell()) {
+        led_on(BLUE_LED);
+        delay(currentDelay);
+        led_off(BLUE_LED);
         userPressed = BLUE_BUTTON;
       } else if (debouncerYellow.fell()) {
-        digitalWrite(YELLOW_LED, LOW);
+        led_on(YELLOW_LED);
         delay(currentDelay);
-        digitalWrite(YELLOW_LED, HIGH);
+        led_off(YELLOW_LED);
         userPressed = YELLOW_BUTTON;
       }
 
