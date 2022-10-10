@@ -22,7 +22,7 @@ unsigned short currentDelay;
 
 void led_on(uint8_t pin){
   pinMode(pin, OUTPUT);
-  digitalWrite(RED_LED, LOW);
+  digitalWrite(pin, LOW);
 }
 
 void led_off(uint8_t pin){
