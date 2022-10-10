@@ -134,7 +134,7 @@ void loop() {
       debouncerBlue.update();
       debouncerYellow.update();
 
-      unsigned short userPressed = 0;
+      int userPressed = -1;
 
       if (debouncerRed.fell()) {
         led_on(RED_LED);
@@ -158,7 +158,7 @@ void loop() {
         userPressed = YELLOW_BUTTON;
       }
 
-      if (userPressed > 0) {
+      if (userPressed > -1) {
         // A button was pressed, check it against current sequence...
         if (userPressed != gameSequence[userPositionInSequence]) {
           // Failed...
