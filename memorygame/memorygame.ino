@@ -51,6 +51,21 @@ void led_off(uint8_t pin){
   pinMode(pin, INPUT);
 }
 
+void fail_strobe(){
+  for(int i = 0; i < 10; ++i){
+    led_on(RED_LED);
+    led_on(GREEN_LED);
+    led_on(BLUE_LED);
+    led_on(YELLOW_LED);
+    delay(75);
+    led_off(RED_LED);
+    led_off(GREEN_LED);
+    led_off(BLUE_LED);
+    led_off(YELLOW_LED);
+    delay(75);
+  }
+}
+
 void setup() {
   debouncerRed.attach(RED_BUTTON, INPUT_PULLUP);
   debouncerRed.interval(30);
@@ -162,6 +177,7 @@ void loop() {
         // A button was pressed, check it against current sequence...
         if (userPressed != gameSequence[userPositionInSequence]) {
           // Failed...
+          fail_strobe();
           tone(BUZZER_PIN, NOTE_F3, 300);
           //
           delay(300);
