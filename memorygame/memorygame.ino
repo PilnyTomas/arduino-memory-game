@@ -1,5 +1,5 @@
 #include <Bounce2.h>
-#include "notes.h"
+//#include "notes.h"
 
 // Pinout set for ESP32-C3 DevkitC
 // Connect with S2 Kaluga via UART:
@@ -12,13 +12,17 @@
 #define BLUE_LED 6
 #define YELLOW_LED 7
 
-#define RED_BUTTON 0
+#define RED_BUTTON 10
 #define GREEN_BUTTON 1
 #define BLUE_BUTTON 2
 #define YELLOW_BUTTON 3
 
 //for use with gameSequence[n]
-uint8_t button_pin_map[4] = {RED_LED, GREEN_LED, BLUE_LED, YELLOW_LED};
+uint8_t button_pin_map[4] = {RED_BUTTON, GREEN_BUTTON, BLUE_BUTTON, YELLOW_BUTTON};
+char button_text_map[4][14] = {"RED_BUTTON", "GREEN_BUTTON", "BLUE_BUTTON", "YELLOW_BUTTON"};
+uint8_t led_pin_map[4] = {RED_LED, GREEN_LED, BLUE_LED, YELLOW_LED};
+char led_text_map[4][14] = {"RED_LED", "GREEN_LED", "BLUE_LED", "YELLOW_LED"};
+
 // GPIO 8 is for RGD LED on board
 
 #define BUZZER_PIN 9
@@ -51,6 +55,7 @@ void led_off(uint8_t pin){
   pinMode(pin, INPUT);
 }
 
+
 void fail_strobe(){
   for(int i = 0; i < 10; ++i){
     led_on(RED_LED);
@@ -66,7 +71,23 @@ void fail_strobe(){
   }
 }
 
+void correct_strobe(){
+    led_on(YELLOW_LED);delay(100);
+    led_on(BLUE_LED);delay(100);
+    led_on(GREEN_LED);delay(100);
+    led_on(RED_LED); delay(100);
+
+    led_off(RED_LED);delay(100);
+    led_off(GREEN_LED);delay(100);
+    led_off(BLUE_LED);delay(100);
+    led_off(YELLOW_LED);delay(100);
+}
+
+
 void setup() {
+  Serial.begin(115200);
+  while(!Serial){delay(100);}
+
   debouncerRed.attach(RED_BUTTON, INPUT_PULLUP);
   debouncerRed.interval(30);
   debouncerGreen.attach(GREEN_BUTTON, INPUT_PULLUP);
@@ -97,7 +118,7 @@ void loop() {
     debouncerGreen.update();
 
     if (debouncerGreen.fell()) {
-      digitalWrite(GREEN_LED, HIGH);
+      led_off(GREEN_LED);
       
       // Create a new game sequence.
       randomSeed(analogRead(0));
@@ -134,9 +155,10 @@ void loop() {
     if (showingSequenceToUser) {
       // Play the pattern out to the user
       for (n = 0; n < currentSequenceLength; n++) {
-        led_on(button_pin_map[gameSequence[n]]);
+        Serial.printf("gameSequence[%d] = %d => Flash pin led_pin_map[%d] = %d = \"%s\"\n", n, gameSequence[n], gameSequence[n], led_pin_map[gameSequence[n]], led_text_map[gameSequence[n]]);
+        led_on(led_pin_map[gameSequence[n]]);
         delay(currentDelay);
-        led_off(button_pin_map[gameSequence[n]]);
+        led_off(led_pin_map[gameSequence[n]]);
         delay(currentDelay);
       }
 
@@ -152,21 +174,25 @@ void loop() {
       int userPressed = -1;
 
       if (debouncerRed.fell()) {
+        Serial.println("red");
         led_on(RED_LED);
         delay(currentDelay);
         led_off(RED_LED);
         userPressed = RED_BUTTON;
       } else  if (debouncerGreen.fell()) {
+        Serial.println("green");
         led_on(GREEN_LED);
         delay(currentDelay);
         led_off(GREEN_LED);
         userPressed = GREEN_BUTTON;
       } else  if (debouncerBlue.fell()) {
+        Serial.println("blue");
         led_on(BLUE_LED);
         delay(currentDelay);
         led_off(BLUE_LED);
         userPressed = BLUE_BUTTON;
       } else if (debouncerYellow.fell()) {
+        Serial.println("yellow");
         led_on(YELLOW_LED);
         delay(currentDelay);
         led_off(YELLOW_LED);
@@ -174,19 +200,23 @@ void loop() {
       }
 
       if (userPressed > -1) {
+        Serial.printf("Evaluate button press:\n userPressed=%d\nuserPositionInSequence=%d\ngameSequence[userPositionInSequence]=%d\nbutton_pin_map[gameSequence[userPositionInSequence]]=%d\nuserPressed != button_pin_map[gameSequence[userPositionInSequence]]=%d\n",userPressed, userPositionInSequence, gameSequence[userPositionInSequence], button_pin_map[gameSequence[userPositionInSequence]], userPressed != button_pin_map[gameSequence[userPositionInSequence]]);
         // A button was pressed, check it against current sequence...
-        if (userPressed != gameSequence[userPositionInSequence]) {
+        if (userPressed != button_pin_map[gameSequence[userPositionInSequence]]) {
           // Failed...
+          Serial.println("  Fail");
           fail_strobe();
-          tone(BUZZER_PIN, NOTE_F3, 300);
+          //tone(BUZZER_PIN, NOTE_F3, 300);
           //
           delay(300);
-          tone(BUZZER_PIN, NOTE_G3, 500);
+          //tone(BUZZER_PIN, NOTE_G3, 500);
           delay(2500);
           gameInProgress = false;
         } else {
+          Serial.println("  Correct");
           userPositionInSequence++;
           if (userPositionInSequence == currentSequenceLength) {
+            correct_strobe();
             // User has successfully repeated back the sequence so make it one longer...
             currentSequenceLength++;
 
@@ -196,7 +226,7 @@ void loop() {
             }
 
             // Play a tone...
-            tone(BUZZER_PIN, NOTE_A3, 300);
+            //tone(BUZZER_PIN, NOTE_A3, 300);
             delay(2000);
 
             showingSequenceToUser = true;
