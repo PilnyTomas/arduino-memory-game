@@ -29,7 +29,7 @@ enum command {RESTART, STARTUP, LEVEL_UP, FAILED};
 
 #define BUZZER_PIN 9
 
-#define MAX_GAME_SEQUENCE 800
+#define MAX_GAME_SEQUENCE 30
 #define FLASH_DELAY 250
 
 Bounce debouncerRed = Bounce();
@@ -86,6 +86,29 @@ void fail_strobe(){
   }
 }
 
+void generate_sequence(unsigned short *sequence, unsigned long max_game_sequence){
+  // Create a new game sequence.
+  randomSeed(analogRead(0));
+  unsigned short second_prev;
+  unsigned short prev;
+
+  sequence[0] = random(0, 3);
+  second_prev = sequence[0];
+  sequence[1] = random(0, 3);
+  prev = sequence[1];
+
+  for (int i = 2; i < max_game_sequence; i++) {
+    sequence[i] = random(0, 3);
+    if(sequence[i] == second_prev || sequence[i] == prev){
+      // prevent 3 matching colors in a row (2 in row is ok)
+      sequence[i] = (sequence[i]+1)%4;
+    }
+    Serial.printf("[%d]=%d\n", i, sequence[i]);
+    second_prev = prev;
+    prev = sequence[i];
+  }
+}
+
 void correct_strobe(){
     led_on(YELLOW_LED);delay(100);
     led_on(BLUE_LED);delay(100);
@@ -97,7 +120,6 @@ void correct_strobe(){
     led_off(BLUE_LED);delay(100);
     led_off(YELLOW_LED);delay(100);
 }
-
 
 void setup() {
   Serial.begin(115200);
@@ -129,12 +151,7 @@ void loop() {
     if (debouncerRed.fell() || debouncerGreen.fell() || debouncerBlue.fell() || debouncerYellow.fell()) {
       all_leds_off();
       
-      // Create a new game sequence.
-      randomSeed(analogRead(0));
-
-      for (n = 0; n < MAX_GAME_SEQUENCE; n++) {
-        gameSequence[n] = random(0, 3);
-      }
+      generate_sequence(gameSequence, MAX_GAME_SEQUENCE);
 
       currentSequenceLength = 1;
 
