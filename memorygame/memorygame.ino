@@ -1,5 +1,6 @@
 #include <Bounce2.h>
 #include "tones.h"
+#include "I2S.h"
 
 // Pinout set for ESP32-C3 DevkitC
 // Connect with S2 Kaluga via UART:
@@ -28,7 +29,7 @@ enum buzzer_msg {PLAY_START, PLAY_SUCCESS, PLAY_LVL_UP, PLAY_FAIL};
 
 // GPIO 8 is for RGD LED on board
 
-#define BUZZER_PIN 9
+#define BUZZER_PIN 25 // also DAC pin
 
 #define MAX_GAME_SEQUENCE 30
 #define FLASH_DELAY 250
@@ -192,7 +193,6 @@ void setup() {
   Serial1.begin(115200);
   while(!Serial1){delay(100);}
 
-  Serial1.write(RESTART);
   buzzer_queue = xQueueCreate(10, sizeof(uint8_t));
   TaskHandle_t buzzer_task_handler = NULL;
   xTaskCreate(
@@ -208,10 +208,14 @@ void setup() {
     // todo
   }
 
+  //I2S.begin(8000);
+
+  Serial1.write(RESTART);
   flash_timer = millis();
 }
 
 void loop() {
+  uint8_t buzzer_job;
   if (! gameInProgress) {
     // Waiting for someone to press any button...
       update_buttons();
@@ -221,7 +225,8 @@ void loop() {
       
       generate_sequence(gameSequence, MAX_GAME_SEQUENCE);
       Serial1.write(STARTUP);
-      xQueueSend(buzzer_queue, (void*)PLAY_START, ( TickType_t ) 10 );
+      buzzer_job = PLAY_START;
+      xQueueSend(buzzer_queue, &buzzer_job, ( TickType_t ) 10 );
 
       currentSequenceLength = 1;
 
@@ -296,7 +301,8 @@ void loop() {
           Serial.println("  Fail");
           Serial1.write(FAILED);
           fail_strobe();
-          xQueueSend(buzzer_queue, (void*)PLAY_FAIL, ( TickType_t ) 10 );
+          buzzer_job = PLAY_FAIL;
+          xQueueSend(buzzer_queue, &buzzer_job, ( TickType_t ) 10 );
           //tone(BUZZER_PIN, NOTE_F3, 300);
           //delay(300);
           //tone(BUZZER_PIN, NOTE_G3, 500);
@@ -307,7 +313,8 @@ void loop() {
           userPositionInSequence++;
           if (userPositionInSequence == currentSequenceLength) {
             correct_strobe();
-            xQueueSend(buzzer_queue, (void*)PLAY_LVL_UP, ( TickType_t ) 10 );
+            buzzer_job = PLAY_LVL_UP;
+            xQueueSend(buzzer_queue, &buzzer_job, ( TickType_t ) 10 );
 
             Serial1.write(LEVEL_UP);
             // User has successfully repeated back the sequence so make it one longer...
@@ -319,7 +326,8 @@ void loop() {
             }
 
             // Play a tone...
-            xQueueSend(buzzer_queue, (void*)PLAY_SUCCESS, ( TickType_t ) 10 );
+            buzzer_job = PLAY_SUCCESS;
+            xQueueSend(buzzer_queue, &buzzer_job, ( TickType_t ) 10 );
 
             //tone(BUZZER_PIN, NOTE_A3, 300);
             //delay(2000);
