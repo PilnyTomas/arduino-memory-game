@@ -11,15 +11,57 @@
 #define TFT_BL      6
 #define TFT_RST    16
 
-#define ERROR 100
-
 #include "SPI.h"
 #include "Adafruit_GFX.h"
 #include "Adafruit_ILI9341.h"
 
+enum command {RESTART, STARTUP, LEVEL_UP, FAILED};
 
 SPIClass TFT_SPI = SPIClass(HSPI);
 Adafruit_ILI9341 tft = Adafruit_ILI9341(&TFT_SPI, TFT_DC, TFT_CS, TFT_RST);
+
+void draw_info(){
+  tft.fillScreen(0xFFFF);
+  tft.setTextSize(2);
+  //tft.setCursor(10, 20); tft.printf("Press any button to start the game");
+  tft.setCursor(5, 20); tft.printf("Stiskni keterekoliv");
+  tft.setCursor(15, 60); tft.printf("tlacitko a zacni");
+  tft.setCursor(90, 100); tft.printf("hrat");
+}
+
+void draw_fail(uint8_t level){
+  tft.fillScreen(0xFFFF);
+
+  tft.setTextSize(3);
+              // X, Y
+  //tft.setCursor(20, 20); tft.printf("GAME OVER! You have reach level");
+  tft.setCursor(30, 20); tft.printf("KONEC HRY!");
+
+  tft.setTextSize(2);
+  tft.setCursor(20, 60); tft.printf("Dosahl jsi urovne");
+
+  tft.setTextSize(4);
+  tft.setCursor(100, 100);
+  tft.printf("%d", level);
+
+  tft.setTextSize(2);
+  if(level < 5){
+    //tft.setCursor(80, 20); tft.printf("Unfortunately that is not enough for any prize. Give way to others and try again later");
+    tft.setCursor(5, 150); tft.printf("Bohuzel to nestaci");
+    tft.setCursor(5, 170); tft.printf("na zadnou z vyher.");
+    tft.setCursor(5, 220); tft.printf("Pust ostatni a zkus");
+    tft.setCursor(5, 240); tft.printf("to znova pozdeji");
+  }else{
+    //tft.setCursor(80, 20); tft.printf("Congratulation! You have won ");
+    tft.setCursor(50, 150); tft.printf("Gratulujeme!");
+    tft.setCursor(5, 170); tft.printf("Vyhravate %s%s", level >= 5 ? "bonbon" : "",  level >= 10 ? "," : "");
+    tft.setCursor(5, 190); tft.printf("%s%s", level >= 10 ? "tricko" : "", level >= 15 ? ", ESP32" : "");
+  }
+
+  tft.setCursor(5, 230); tft.printf("Stiskni keterekoliv");
+  tft.setCursor(15, 250); tft.printf("tlacitko a zacni");
+  tft.setCursor(90, 270); tft.printf("hrat");
+}
 
 void draw_progress(uint8_t level){
   tft.fillScreen(0xFFFF);
@@ -57,42 +99,33 @@ void setup() {
   tft.setFont(NULL);
   tft.setTextSize(2);
 
-  draw_progress(0);
-
-  // demonstration
-  /*
-  uint8_t level = 0;
-  do{
-    draw_progress(level++);
-    delay(1000);
-  }while(level <= 25);
-  */
+  draw_info(); // Press any button to start
 }
 
 void loop(){
+  static uint8_t game_level = 0;
   uint8_t incomingByte;
   if(Serial.available() > 0){
     incomingByte = Serial.read();
-    if(incomingByte < 30){
-      draw_progress(incomingByte);
-    }else if(incomingByte >= '0' && incomingByte <= '9'){
-      uint8_t level = incomingByte - '0';
-      if(Serial.available() > 0){ // second digit ?
-        incomingByte = Serial.read();
-        if(incomingByte >= '0' && incomingByte <= '9'){
-          level = level * 10 + incomingByte - '0';
-        }else{ // else second character is junk and whole transmission will be ignored
-          Serial.println("junk");
-          level = ERROR;
-        }
-      }else{
-      } // second digit?
-      if(level < ERROR){
-        draw_progress(level);
-      } // if ERROR
-    } // is it character ?
+    incomingByte = incomingByte - '0'; // convert from char to number
 
-  }else{ // Serial not available
-    delay(100);
-  } // if serial available
+    switch(incomingByte){
+      case RESTART: // after controller startup/flashing/restart
+        draw_info(); // Press any button to start
+        break;
+      case STARTUP: // after button press, at the beginning of a new game
+        game_level = 0;
+        draw_progress(game_level);
+        break;
+      case LEVEL_UP:
+        draw_progress(++game_level);
+        break;
+      case FAILED:
+        draw_fail(game_level);
+        delay(10000);
+        game_level = 0;
+        draw_info();
+        break;
+    }
+  }
 }

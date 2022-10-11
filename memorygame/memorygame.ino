@@ -1,5 +1,5 @@
 #include <Bounce2.h>
-//#include "notes.h"
+#include "tones.h"
 
 // Pinout set for ESP32-C3 DevkitC
 // Connect with S2 Kaluga via UART:
@@ -24,6 +24,7 @@ uint8_t led_pin_map[4] = {RED_LED, GREEN_LED, BLUE_LED, YELLOW_LED};
 char led_text_map[4][14] = {"RED_LED", "GREEN_LED", "BLUE_LED", "YELLOW_LED"};
 
 enum command {RESTART, STARTUP, LEVEL_UP, FAILED};
+enum buzzer_msg {PLAY_START, PLAY_SUCCESS, PLAY_LVL_UP, PLAY_FAIL};
 
 // GPIO 8 is for RGD LED on board
 
@@ -46,6 +47,7 @@ unsigned short currentSequenceLength;
 unsigned short userPositionInSequence;
 unsigned short n;
 unsigned long flash_timer;
+QueueHandle_t buzzer_queue;
 
 void led_on(uint8_t pin){
   pinMode(pin, OUTPUT);
@@ -86,6 +88,36 @@ void fail_strobe(){
   }
 }
 
+void play_start(){
+  tone(BUZZER_PIN, NOTE_G3, 250);
+  delay(250);
+  tone(BUZZER_PIN, NOTE_G3, 250);
+  delay(250);
+  tone(BUZZER_PIN, NOTE_F3, 500);
+}
+
+void play_success(){
+  tone(BUZZER_PIN, NOTE_A3, 300);
+}
+
+void play_lvl_up(){
+  tone(BUZZER_PIN, NOTE_A3, 250);
+  delay(250);
+  tone(BUZZER_PIN, NOTE_B3, 250);
+  delay(250);
+  tone(BUZZER_PIN, NOTE_C4, 250);
+  delay(250);
+  tone(BUZZER_PIN, NOTE_D4, 250);
+  delay(250);
+  tone(BUZZER_PIN, NOTE_E4, 250);
+}
+
+void play_fail(){
+  tone(BUZZER_PIN, NOTE_F3, 300);
+  delay(300);
+  tone(BUZZER_PIN, NOTE_G3, 500);
+}
+
 void generate_sequence(unsigned short *sequence, unsigned long max_game_sequence){
   // Create a new game sequence.
   randomSeed(analogRead(0));
@@ -121,6 +153,27 @@ void correct_strobe(){
     led_off(YELLOW_LED);delay(100);
 }
 
+void buzzer_task(void* param){
+  while(1){
+    uint8_t buzzer_job;
+    xQueueReceive(buzzer_queue, &buzzer_job, portMAX_DELAY);
+    switch(buzzer_job){
+      case PLAY_START:
+        play_start();
+        break;
+      case PLAY_SUCCESS:
+        play_success();
+        break;
+      case PLAY_LVL_UP:
+        play_lvl_up();
+        break;
+      case PLAY_FAIL:
+        play_fail();
+        break;
+    } // swtich
+  } // inf loop
+}
+
 void setup() {
   Serial.begin(115200);
   while(!Serial){delay(100);}
@@ -136,10 +189,25 @@ void setup() {
 
   pinMode(BUZZER_PIN, OUTPUT);
 
-  //Serial1.begin(115200);
-  //while(!Serial1){delay(100);}
+  Serial1.begin(115200);
+  while(!Serial1){delay(100);}
 
-  //Serial1.write(RESTART);
+  Serial1.write(RESTART);
+  buzzer_queue = xQueueCreate(10, sizeof(uint8_t));
+  TaskHandle_t buzzer_task_handler = NULL;
+  xTaskCreate(
+    buzzer_task,   // Function to implement the task
+    "buzzer_task", // Name of the task
+    1000,              // Stack size in words
+    (void *) NULL,    // Task input parameter
+    1,                       // Priority of the task
+    &buzzer_task_handler     // Task handle.
+    );
+  if(buzzer_task_handler == NULL){
+    log_e("Could not create red task");
+    // todo
+  }
+
   flash_timer = millis();
 }
 
@@ -152,6 +220,8 @@ void loop() {
       all_leds_off();
       
       generate_sequence(gameSequence, MAX_GAME_SEQUENCE);
+      Serial1.write(STARTUP);
+      xQueueSend(buzzer_queue, (void*)PLAY_START, ( TickType_t ) 10 );
 
       currentSequenceLength = 1;
 
@@ -224,9 +294,10 @@ void loop() {
         if (userPressed != button_pin_map[gameSequence[userPositionInSequence]]) {
           // Failed...
           Serial.println("  Fail");
+          Serial1.write(FAILED);
           fail_strobe();
+          xQueueSend(buzzer_queue, (void*)PLAY_FAIL, ( TickType_t ) 10 );
           //tone(BUZZER_PIN, NOTE_F3, 300);
-          //
           //delay(300);
           //tone(BUZZER_PIN, NOTE_G3, 500);
           //delay(2500);
@@ -236,6 +307,9 @@ void loop() {
           userPositionInSequence++;
           if (userPositionInSequence == currentSequenceLength) {
             correct_strobe();
+            xQueueSend(buzzer_queue, (void*)PLAY_LVL_UP, ( TickType_t ) 10 );
+
+            Serial1.write(LEVEL_UP);
             // User has successfully repeated back the sequence so make it one longer...
             currentSequenceLength++;
 
@@ -245,6 +319,8 @@ void loop() {
             }
 
             // Play a tone...
+            xQueueSend(buzzer_queue, (void*)PLAY_SUCCESS, ( TickType_t ) 10 );
+
             //tone(BUZZER_PIN, NOTE_A3, 300);
             //delay(2000);
 
