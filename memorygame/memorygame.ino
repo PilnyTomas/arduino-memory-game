@@ -23,11 +23,14 @@ char button_text_map[4][14] = {"RED_BUTTON", "GREEN_BUTTON", "BLUE_BUTTON", "YEL
 uint8_t led_pin_map[4] = {RED_LED, GREEN_LED, BLUE_LED, YELLOW_LED};
 char led_text_map[4][14] = {"RED_LED", "GREEN_LED", "BLUE_LED", "YELLOW_LED"};
 
+enum command {RESTART, STARTUP, LEVEL_UP, FAILED};
+
 // GPIO 8 is for RGD LED on board
 
 #define BUZZER_PIN 9
 
 #define MAX_GAME_SEQUENCE 800
+#define FLASH_DELAY 250
 
 Bounce debouncerRed = Bounce();
 Bounce debouncerGreen = Bounce();
@@ -39,34 +42,46 @@ unsigned short gameSequence[MAX_GAME_SEQUENCE];
 bool gameInProgress = false;
 bool attractLEDOn = false;
 bool showingSequenceToUser;
-unsigned short currentDelay;
 unsigned short currentSequenceLength;
 unsigned short userPositionInSequence;
 unsigned short n;
-unsigned long count = 0;
-uint8_t level = 0; // game level to be tracked on TFT display
+unsigned long flash_timer;
 
 void led_on(uint8_t pin){
   pinMode(pin, OUTPUT);
   digitalWrite(pin, LOW);
 }
 
+void all_leds_on(){
+  led_on(RED_LED);
+  led_on(GREEN_LED);
+  led_on(BLUE_LED);
+  led_on(YELLOW_LED);
+}
+
 void led_off(uint8_t pin){
   pinMode(pin, INPUT);
 }
 
+void all_leds_off(){
+  led_off(RED_LED);
+  led_off(GREEN_LED);
+  led_off(BLUE_LED);
+  led_off(YELLOW_LED);
+}
+
+void update_buttons(){
+  debouncerRed.update();
+  debouncerGreen.update();
+  debouncerBlue.update();
+  debouncerYellow.update();
+}
 
 void fail_strobe(){
   for(int i = 0; i < 10; ++i){
-    led_on(RED_LED);
-    led_on(GREEN_LED);
-    led_on(BLUE_LED);
-    led_on(YELLOW_LED);
+    all_leds_on();
     delay(75);
-    led_off(RED_LED);
-    led_off(GREEN_LED);
-    led_off(BLUE_LED);
-    led_off(YELLOW_LED);
+    all_leds_off();
     delay(75);
   }
 }
@@ -99,26 +114,20 @@ void setup() {
 
   pinMode(BUZZER_PIN, OUTPUT);
 
-/*
-  Serial1.begin(115200);
-  while(!Serial1){delay(100);}
+  //Serial1.begin(115200);
+  //while(!Serial1){delay(100);}
 
-  uint8_t level = 0;
-  do{
-    Serial1.write(level++);
-    delay(100);
-  }while(level <= 25);
-  Serial1.write(0);
-  */
+  //Serial1.write(RESTART);
+  flash_timer = millis();
 }
 
 void loop() {
   if (! gameInProgress) {
-    // Waiting for someone to press the green button...
-    debouncerGreen.update();
+    // Waiting for someone to press any button...
+      update_buttons();
 
-    if (debouncerGreen.fell()) {
-      led_off(GREEN_LED);
+    if (debouncerRed.fell() || debouncerGreen.fell() || debouncerBlue.fell() || debouncerYellow.fell()) {
+      all_leds_off();
       
       // Create a new game sequence.
       randomSeed(analogRead(0));
@@ -128,27 +137,23 @@ void loop() {
       }
 
       currentSequenceLength = 1;
-      currentDelay = 500;
 
       gameInProgress = true;
-      count = 0;
       showingSequenceToUser = true;
 
       // Little delay before the game starts.
-      delay(1000);
+      delay(500);
     } else {
       // Attract mode - flash the green LED.
-      if (count == 50000) {
+      if (millis() - flash_timer >= FLASH_DELAY){
         attractLEDOn = ! attractLEDOn;
         if(attractLEDOn){
-          led_on(GREEN_LED);
+          all_leds_on();
         }else{
-          led_off(GREEN_LED);
+          all_leds_off();
         }
-        count = 0;    
-      } 
-      
-      count++;
+        flash_timer = millis();
+      }
     }
   } else {
     // Game is in progress...
@@ -157,44 +162,41 @@ void loop() {
       for (n = 0; n < currentSequenceLength; n++) {
         Serial.printf("gameSequence[%d] = %d => Flash pin led_pin_map[%d] = %d = \"%s\"\n", n, gameSequence[n], gameSequence[n], led_pin_map[gameSequence[n]], led_text_map[gameSequence[n]]);
         led_on(led_pin_map[gameSequence[n]]);
-        delay(currentDelay);
+        delay(FLASH_DELAY);
         led_off(led_pin_map[gameSequence[n]]);
-        delay(currentDelay);
+        delay(FLASH_DELAY);
       }
 
       showingSequenceToUser = false;
       userPositionInSequence = 0;
     } else {
       // Waiting for the user to repeat the sequence back
-      debouncerGreen.update();
-      debouncerRed.update();
-      debouncerBlue.update();
-      debouncerYellow.update();
+      update_buttons();
 
       int userPressed = -1;
 
       if (debouncerRed.fell()) {
         Serial.println("red");
         led_on(RED_LED);
-        delay(currentDelay);
+        delay(FLASH_DELAY);
         led_off(RED_LED);
         userPressed = RED_BUTTON;
       } else  if (debouncerGreen.fell()) {
         Serial.println("green");
         led_on(GREEN_LED);
-        delay(currentDelay);
+        delay(FLASH_DELAY);
         led_off(GREEN_LED);
         userPressed = GREEN_BUTTON;
       } else  if (debouncerBlue.fell()) {
         Serial.println("blue");
         led_on(BLUE_LED);
-        delay(currentDelay);
+        delay(FLASH_DELAY);
         led_off(BLUE_LED);
         userPressed = BLUE_BUTTON;
       } else if (debouncerYellow.fell()) {
         Serial.println("yellow");
         led_on(YELLOW_LED);
-        delay(currentDelay);
+        delay(FLASH_DELAY);
         led_off(YELLOW_LED);
         userPressed = YELLOW_BUTTON;
       }
@@ -208,9 +210,9 @@ void loop() {
           fail_strobe();
           //tone(BUZZER_PIN, NOTE_F3, 300);
           //
-          delay(300);
+          //delay(300);
           //tone(BUZZER_PIN, NOTE_G3, 500);
-          delay(2500);
+          //delay(2500);
           gameInProgress = false;
         } else {
           Serial.println("  Correct");
@@ -227,7 +229,7 @@ void loop() {
 
             // Play a tone...
             //tone(BUZZER_PIN, NOTE_A3, 300);
-            delay(2000);
+            //delay(2000);
 
             showingSequenceToUser = true;
           }
