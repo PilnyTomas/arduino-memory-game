@@ -1,6 +1,9 @@
 #include <Bounce2.h>
 #include "tones.h"
 #include "I2S.h"
+#include "start_1.c"
+#include "lvl_up_1.c"
+#include "fail_1.c"
 
 // Pinout set for ESP32-C3 DevkitC
 // Connect with S2 Kaluga via UART:
@@ -29,7 +32,7 @@ enum buzzer_msg {PLAY_START, PLAY_SUCCESS, PLAY_LVL_UP, PLAY_FAIL};
 
 // GPIO 8 is for RGD LED on board
 
-#define BUZZER_PIN 25 // also DAC pin
+#define BUZZER_PIN 9 // PDM
 
 #define MAX_GAME_SEQUENCE 30
 #define FLASH_DELAY 250
@@ -90,36 +93,75 @@ void fail_strobe(){
 }
 
 void play_start(){
-  tone(BUZZER_PIN, NOTE_G3, 250);
-  delay(250);
-  tone(BUZZER_PIN, NOTE_G3, 250);
-  delay(250);
-  tone(BUZZER_PIN, NOTE_F3, 500);
+  log_d("play start (but not really)");
+  delay(2000);
+  /*
+  if(I2S.begin(PDM_MONO_MODE, start_1_sampling_frequency, start_1_bits_per_sample)){
+    I2S.setDataInPin(BUZZER_PIN);
+    I2S.write(start_1_samples, start_1_size);
+    I2S.end();
+  }
+  */
+/*
+  tone(BUZZER_PIN, NOTE_D3, 150);
+  delay(150);
+  tone(BUZZER_PIN, NOTE_E3, 150);
+  delay(150);
+  tone(BUZZER_PIN, NOTE_F3, 150);
+  delay(150);
+  tone(BUZZER_PIN, NOTE_G3, 300);
+*/
 }
 
-void play_success(){
-  tone(BUZZER_PIN, NOTE_A3, 300);
+void play_success(){ // play after each successful button press (not necessary)
+  //tone(BUZZER_PIN, NOTE_A3, 250);
 }
 
 void play_lvl_up(){
-  tone(BUZZER_PIN, NOTE_A3, 250);
-  delay(250);
-  tone(BUZZER_PIN, NOTE_B3, 250);
-  delay(250);
-  tone(BUZZER_PIN, NOTE_C4, 250);
-  delay(250);
-  tone(BUZZER_PIN, NOTE_D4, 250);
-  delay(250);
-  tone(BUZZER_PIN, NOTE_E4, 250);
+  log_d("play lvl up (but not really)");
+  delay(2000);
+  /*
+  if(I2S.begin(PDM_MONO_MODE, lvl_up_1_sampling_frequency, lvl_up_1_bits_per_sample)){
+    I2S.setDataInPin(BUZZER_PIN);
+    I2S.write(lvl_up_1_samples, lvl_up_1_size);
+    I2S.end();
+  }
+  */
+/*
+  tone(BUZZER_PIN, NOTE_B3, 150);
+  delay(150);
+  tone(BUZZER_PIN, NOTE_C4, 150);
+  delay(150);
+  tone(BUZZER_PIN, NOTE_D4, 150);
+  delay(150);
+  tone(BUZZER_PIN, NOTE_E4, 200);
+  */
 }
 
 void play_fail(){
-  tone(BUZZER_PIN, NOTE_F3, 300);
-  delay(300);
-  tone(BUZZER_PIN, NOTE_G3, 500);
+  log_d("play fail (but not really)");
+  delay(2000);
+  /*
+  if(I2S.begin(PDM_MONO_MODE, fail_1_sampling_frequency, fail_1_bits_per_sample)){
+    I2S.setDataInPin(BUZZER_PIN);
+    I2S.write(fail_1_samples, fail_1_size);
+    I2S.end();
+  }
+  */
+  /*
+  // tu-du-du-duuu
+  tone(BUZZER_PIN, NOTE_G3, 150);
+  delay(150);
+  tone(BUZZER_PIN, NOTE_F3, 150);
+  delay(150);
+  tone(BUZZER_PIN, NOTE_E3, 150);
+  delay(150);
+  tone(BUZZER_PIN, NOTE_D3, 400);
+  */
 }
 
 void generate_sequence(unsigned short *sequence, unsigned long max_game_sequence){
+  //log_d("gen sequence");
   // Create a new game sequence.
   randomSeed(analogRead(0));
   unsigned short second_prev;
@@ -130,6 +172,7 @@ void generate_sequence(unsigned short *sequence, unsigned long max_game_sequence
   sequence[1] = random(0, 3);
   prev = sequence[1];
 
+  //log_d("start generating");
   for (int i = 2; i < max_game_sequence; i++) {
     sequence[i] = random(0, 3);
     if(sequence[i] == second_prev || sequence[i] == prev){
@@ -140,6 +183,7 @@ void generate_sequence(unsigned short *sequence, unsigned long max_game_sequence
     second_prev = prev;
     prev = sequence[i];
   }
+  //log_d("done generating");
 }
 
 void correct_strobe(){
@@ -156,22 +200,37 @@ void correct_strobe(){
 
 void buzzer_task(void* param){
   while(1){
-    uint8_t buzzer_job;
-    xQueueReceive(buzzer_queue, &buzzer_job, portMAX_DELAY);
-    switch(buzzer_job){
-      case PLAY_START:
-        play_start();
-        break;
-      case PLAY_SUCCESS:
-        play_success();
-        break;
-      case PLAY_LVL_UP:
-        play_lvl_up();
-        break;
-      case PLAY_FAIL:
-        play_fail();
-        break;
-    } // swtich
+    uint8_t buzzer_job = 255;
+    //log_d("receiving side - buzzer_job after init %d", buzzer_job);
+    if( buzzer_queue != NULL ){
+      //log_d("receiving side - queue exists");
+      if(xQueueReceive(buzzer_queue, &buzzer_job, ( TickType_t ) 100 ) == pdPASS){
+        log_d("receiving side - queue received item %d", buzzer_job);
+        //delay(500);
+        //Serial.printf("buzzer task job %d\n", buzzer_job);
+        //delay(500);
+        switch(buzzer_job){
+          case PLAY_START:
+            log_d("switch: PLAY_START");
+            play_start();
+            break;
+          case PLAY_SUCCESS:
+            log_d("switch: PLAY_SUCCESS");
+            play_success();
+            break;
+          case PLAY_LVL_UP:
+            log_d("switch: PLAY_LVL_UP");
+            play_lvl_up();
+            break;
+          case PLAY_FAIL:
+            log_d("switch: PLAY_FAIL");
+            play_fail();
+            break;
+          default:
+            log_d("switch: default");
+        } // swtich
+      } // if xQueueReceive OK
+    } // if buzzer_queue exists
   } // inf loop
 }
 
@@ -190,15 +249,15 @@ void setup() {
 
   pinMode(BUZZER_PIN, OUTPUT);
 
-  Serial1.begin(115200);
-  while(!Serial1){delay(100);}
+  //Serial1.begin(115200);
+  //while(!Serial1){delay(100);}
 
   buzzer_queue = xQueueCreate(10, sizeof(uint8_t));
   TaskHandle_t buzzer_task_handler = NULL;
   xTaskCreate(
     buzzer_task,   // Function to implement the task
     "buzzer_task", // Name of the task
-    1000,              // Stack size in words
+    5000,              // Stack size in words
     (void *) NULL,    // Task input parameter
     1,                       // Priority of the task
     &buzzer_task_handler     // Task handle.
@@ -208,14 +267,16 @@ void setup() {
     // todo
   }
 
-  //I2S.begin(8000);
+  //I2S.begin(PDM_STEREO_MODE, 8000, 16);
+  //I2S.begin(PDM_MONO_MODE, lvl_up_audioSamplingFrequency, 16);
+  //I2S.setDataInPin(BUZZER_PIN);
 
-  Serial1.write(RESTART);
+  //Serial1.write(RESTART);
   flash_timer = millis();
 }
 
 void loop() {
-  uint8_t buzzer_job;
+  uint8_t buzzer_job = 255;
   if (! gameInProgress) {
     // Waiting for someone to press any button...
       update_buttons();
@@ -223,10 +284,18 @@ void loop() {
     if (debouncerRed.fell() || debouncerGreen.fell() || debouncerBlue.fell() || debouncerYellow.fell()) {
       all_leds_off();
       
-      generate_sequence(gameSequence, MAX_GAME_SEQUENCE);
-      Serial1.write(STARTUP);
       buzzer_job = PLAY_START;
-      xQueueSend(buzzer_queue, &buzzer_job, ( TickType_t ) 10 );
+      if( buzzer_queue != 0 ){
+        if(xQueueSend(buzzer_queue, ( void * ) &buzzer_job, ( TickType_t ) 100 ) != pdPASS ){
+          log_d("O-oufailt to push into queue");
+        }else{
+          log_d("ok, pushed to queue %d", buzzer_job);
+        }
+      }else{
+        log_d("Oh no, how could this happen buzzer_queue is == 0");
+      }
+      //Serial1.write(STARTUP);
+      generate_sequence(gameSequence, MAX_GAME_SEQUENCE);
 
       currentSequenceLength = 1;
 
@@ -240,7 +309,7 @@ void loop() {
       if (millis() - flash_timer >= FLASH_DELAY){
         attractLEDOn = ! attractLEDOn;
         if(attractLEDOn){
-          all_leds_on();
+          //all_leds_on(); // TODO - uncommnet - this was annoying to work with
         }else{
           all_leds_off();
         }
@@ -299,10 +368,10 @@ void loop() {
         if (userPressed != button_pin_map[gameSequence[userPositionInSequence]]) {
           // Failed...
           Serial.println("  Fail");
-          Serial1.write(FAILED);
-          fail_strobe();
+          //Serial1.write(FAILED);
           buzzer_job = PLAY_FAIL;
           xQueueSend(buzzer_queue, &buzzer_job, ( TickType_t ) 10 );
+          fail_strobe();
           //tone(BUZZER_PIN, NOTE_F3, 300);
           //delay(300);
           //tone(BUZZER_PIN, NOTE_G3, 500);
@@ -312,11 +381,11 @@ void loop() {
           Serial.println("  Correct");
           userPositionInSequence++;
           if (userPositionInSequence == currentSequenceLength) {
-            correct_strobe();
             buzzer_job = PLAY_LVL_UP;
             xQueueSend(buzzer_queue, &buzzer_job, ( TickType_t ) 10 );
+            //Serial1.write(LEVEL_UP);
+            correct_strobe();
 
-            Serial1.write(LEVEL_UP);
             // User has successfully repeated back the sequence so make it one longer...
             currentSequenceLength++;
 
