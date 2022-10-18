@@ -31,12 +31,17 @@ char led_text_map[4][14] = {"RED_LED", "GREEN_LED", "BLUE_LED", "YELLOW_LED"};
 enum command {RESTART, STARTUP, LEVEL_UP, FAILED};
 enum buzzer_msg {PLAY_START, PLAY_SUCCESS, PLAY_LVL_UP, PLAY_FAIL, PLAY_RED, PLAY_GREEN, PLAY_BLUE, PLAY_YELLOW};
 
+typedef struct {
+  uint8_t led_pin;
+  uint16_t flash_millis; // how long the LED stays on
+} led_blink_t;
+
 // GPIO 8 is for RGD LED on board
 
 #define BUZZER_PIN 9
 
 #define MAX_GAME_SEQUENCE 30
-#define FLASH_DELAY 250
+#define FLASH_DELAY 500
 
 Bounce debouncerRed = Bounce();
 Bounce debouncerGreen = Bounce();
@@ -53,6 +58,7 @@ unsigned short userPositionInSequence;
 unsigned short n;
 unsigned long flash_timer;
 QueueHandle_t buzzer_queue;
+QueueHandle_t led_queue;
 
 void led_on(uint8_t pin){
   pinMode(pin, OUTPUT);
@@ -251,10 +257,24 @@ void buzzer_task(void* param){
           case PLAY_YELLOW:
             play_yellow();
             break;
-          default:
         } // swtich
       } // if xQueueReceive OK
     } // if buzzer_queue exists
+  } // inf loop
+}
+
+
+void led_task(void* param){
+  led_blink_t led_job;
+  while(1){
+    if( led_queue != NULL ){
+      if(xQueueReceive(led_queue, &led_job, ( TickType_t ) 0 ) == pdPASS){
+        Serial.printf("flash led %s on pin %d for %d ms\n", led_text_map[led_job.led_pin-RED_LED], led_job.led_pin, led_job.flash_millis);
+        led_on(led_job.led_pin);
+        delay(led_job.flash_millis);
+        led_off(led_job.led_pin);
+      } // if xQueueReceive OK
+    } // if led_queue exists
   } // inf loop
 }
 
@@ -287,21 +307,44 @@ void setup() {
     &buzzer_task_handler     // Task handle.
     );
   if(buzzer_task_handler == NULL){
-    log_e("Could not create red task");
+    log_e("Could not create buzzer task");
     ESP.restart();
   }
+
+  led_queue = xQueueCreate(10, sizeof(led_blink_t));
+  TaskHandle_t led_task_handler = NULL;
+  xTaskCreate(
+    led_task,   // Function to implement the task
+    "led_task", // Name of the task
+    5000,              // Stack size in words
+    (void *) NULL,    // Task input parameter
+    1,                       // Priority of the task
+    &led_task_handler     // Task handle.
+    );
+  if(led_task_handler == NULL){
+    log_e("Could not create led task");
+    ESP.restart();
+  }
+
+
   Serial1.write(RESTART);
   flash_timer = millis();
 }
 
+// TODO variable speed (FLASH_DELAY)
+
 void loop() {
   uint8_t buzzer_job = 255;
+  led_blink_t led_job;
+  led_job.flash_millis = FLASH_DELAY;
   if (! gameInProgress) {
     // Waiting for someone to press any button...
       update_buttons();
 
-    if (debouncerRed.fell() || debouncerGreen.fell() || debouncerBlue.fell() || debouncerYellow.fell()) {
-      all_leds_off();
+    //if (debouncerRed.fell() || debouncerGreen.fell() || debouncerBlue.fell() || debouncerYellow.fell()) {
+    //all_leds_off();
+    if (debouncerGreen.fell()) {
+      led_off(GREEN_LED);
       
       buzzer_job = PLAY_START;
       if( buzzer_queue != 0 ){
@@ -320,15 +363,17 @@ void loop() {
       showingSequenceToUser = true;
 
       // Little delay before the game starts.
-      delay(500);
+      delay(2*FLASH_DELAY);
     } else {
       // Attract mode - flash the green LED.
-      if (millis() - flash_timer >= FLASH_DELAY){
+      if (millis() - flash_timer >= 2*FLASH_DELAY){
         attractLEDOn = ! attractLEDOn;
         if(attractLEDOn){
-          all_leds_on();
+          //all_leds_on();
+          led_on(GREEN_LED);
         }else{
-          all_leds_off();
+          //all_leds_off();
+          led_off(GREEN_LED);
         }
         flash_timer = millis();
       }
@@ -345,7 +390,7 @@ void loop() {
         led_off(led_pin_map[gameSequence[n]]);
         delay(FLASH_DELAY);
       }
-
+      delay(2*FLASH_DELAY);
       showingSequenceToUser = false;
       userPositionInSequence = 0;
     } else {
@@ -357,30 +402,47 @@ void loop() {
       if (debouncerRed.fell()) {
         Serial.println("Red");
         buzzer_job = PLAY_RED; xQueueSend(buzzer_queue, &buzzer_job, ( TickType_t ) 10 );
+        led_job.led_pin = RED_LED;
+        xQueueSend(led_queue, ( void * ) &led_job, ( TickType_t ) 100 );
+        /*
         led_on(RED_LED);
         delay(FLASH_DELAY);
         led_off(RED_LED);
+        */
         userPressed = RED_BUTTON;
       } else  if (debouncerGreen.fell()) {
         Serial.println("Green");
         buzzer_job = PLAY_GREEN; xQueueSend(buzzer_queue, &buzzer_job, ( TickType_t ) 10 );
+        led_job.led_pin = GREEN_LED;
+        xQueueSend(led_queue, ( void * ) &led_job, ( TickType_t ) 100 );
+        /*
         led_on(GREEN_LED);
         delay(FLASH_DELAY);
         led_off(GREEN_LED);
+        */
         userPressed = GREEN_BUTTON;
       } else  if (debouncerBlue.fell()) {
         Serial.println("Blue");
         buzzer_job = PLAY_BLUE; xQueueSend(buzzer_queue, &buzzer_job, ( TickType_t ) 10 );
+        led_job.led_pin = BLUE_LED;
+        led_job.flash_millis =FLASH_DELAY;
+        xQueueSend(led_queue, ( void * ) &led_job, ( TickType_t ) 100 );
+        /*
         led_on(BLUE_LED);
         delay(FLASH_DELAY);
         led_off(BLUE_LED);
+        */
         userPressed = BLUE_BUTTON;
       } else if (debouncerYellow.fell()) {
         Serial.println("Yellow");
         buzzer_job = PLAY_YELLOW; xQueueSend(buzzer_queue, &buzzer_job, ( TickType_t ) 10 );
+        led_job.led_pin = YELLOW_LED;
+        xQueueSend(led_queue, ( void * ) &led_job, ( TickType_t ) 100 );
+        /*
         led_on(YELLOW_LED);
         delay(FLASH_DELAY);
         led_off(YELLOW_LED);
+        */
         userPressed = YELLOW_BUTTON;
       }
 
@@ -405,7 +467,8 @@ void loop() {
             buzzer_job = PLAY_LVL_UP;
             xQueueSend(buzzer_queue, &buzzer_job, ( TickType_t ) 10 );
             Serial1.write(LEVEL_UP);
-            correct_strobe();
+            //correct_strobe();
+            delay(4*FLASH_DELAY);
 
             // User has successfully repeated back the sequence so make it one longer...
             currentSequenceLength++;
