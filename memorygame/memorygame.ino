@@ -334,6 +334,7 @@ void setup() {
 // TODO variable speed (FLASH_DELAY)
 
 void loop() {
+  static uint8_t high_score = 10;
   uint8_t buzzer_job = 255;
   led_blink_t led_job;
   led_job.flash_millis = FLASH_DELAY;
@@ -451,8 +452,10 @@ void loop() {
         // A button was pressed, check it against current sequence...
         if (userPressed != button_pin_map[gameSequence[userPositionInSequence]]) {
           // Failed...
-          Serial.println("  Fail");
+          Serial.print("  Fail; high_score = %d; current level = %d %s\n", high_score, currentSequenceLength, currentSequenceLength > high_score ? "NEW HIGH SCORE!" : "");
           Serial1.write(FAILED);
+          high_score = currentSequenceLength > high_score ? currentSequenceLength : high_score;
+          Serial1.write(high_score);
           buzzer_job = PLAY_FAIL;
           xQueueSend(buzzer_queue, &buzzer_job, ( TickType_t ) 10 );
           fail_strobe();
