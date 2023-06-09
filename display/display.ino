@@ -19,8 +19,8 @@
 
 #define CANDY_LVL 5
 #define KEYCHAIN_LVL 10
-#define TSHIRT_LVL 15
-#define DEV_BOARD_LVL 20
+#define TSHIRT_LVL 18
+#define DEV_BOARD_LVL 21
 
 #define FAKE_HIGH_SCORE_INIT CANDY_LVL-1
 
@@ -70,7 +70,7 @@ void draw_fail(uint8_t level, uint8_t high_score){
     //tft.setCursor(80, 20); tft.printf("Congratulation! You have won ");
     tft.setCursor(50, 150); tft.printf("Gratulujeme!");
     tft.setCursor(5, 170); tft.printf("Vyhravate %s%s", level >= CANDY_LVL ? "bonbon" : "", level >= KEYCHAIN_LVL ? ", klicenku`" : "");
-    tft.setCursor(5, 190); tft.printf("%s%s", level >= TSHIRT_LVL ? ", tricko" : "", level >= DEV_BOARD_LVL ? ", ESP32" : "");
+    tft.setCursor(5, 190); tft.printf("%s%s", level >= TSHIRT_LVL ? ", platenku" : "", level >= DEV_BOARD_LVL ? ", tricko" : "");
   }
 
   //tft.setCursor(5, 230); tft.printf("Stiskni keterekoliv");
